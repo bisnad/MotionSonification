@@ -1,0 +1,128 @@
+class:: ZitaRev1ST
+summary:: Reverb estéreo híbrida Schroeder/FDN
+categories:: UGens>Reverbs
+related::  Classes/FreeVerb, Classes/FreeVerb2, Classes/GVerb
+
+description::
+Faust Zita-Rev1, FOSS Linux, Fons Adriaensen.
+
+image::zita_rev1.png#High-level block diagram of zita_rev1_engine in Faust::
+
+classmethods::
+method:: ar
+
+argument:: in1
+Canal izquierdo mono.
+
+argument:: in2
+Canal derecho mono.
+
+argument:: drywet
+Relación dry/wet. Valores entre 0 y 1, por defecto 0.5.
+
+argument:: lowfreq
+Crossover graves, desde DC. Valores entre 100 y 1000, por defecto 600 Hz.
+
+argument:: midfreq
+Crossover medios, desde lowfreq. Valores entre 1000 y 10000, por defecto 6000 Hz.
+
+argument:: predelay
+Predelay entre 0 y 250 milisegundos, por defecto 0.1 mseg.
+
+argument:: rt60low
+Tiempo de reverberación para banda de graves. Valores entre 0.01 y 20 segundos, por defecto 3 seg.
+
+argument:: rt60mid
+Tiempo de reverberación para banda de medios. Valores entre 0.01 y 20 segundos, por defecto 3 seg.
+
+
+examples::
+code::
+
+(
+s.options.memSize_(1048576); //recomendable ampliar memoria dinámica del servidor
+s.quit;
+s.waitForBoot({
+
+	SynthDef(\testReverb, { arg drylevel=0.5, lowfreq=600, midfreq=6000, predelay=0, rt60low=1, rt60mid=1;
+
+		var sig = Splay.ar(Resonz.ar(
+			Array.fill(4, { Dust.ar(2) }),
+			LFNoise1.kr(1).exprange(100,1000) * [1, 2, 4, 8], 0.1
+		)) * 50;
+
+		sig = Rotate2.ar(sig[0],sig[1],LFNoise1.kr(1).range(-1.0,1.0));
+
+		Out.ar(0, ZitaRev1ST.ar(
+			sig[0],
+			sig[1],
+			drylevel,
+			lowfreq,
+			midfreq,
+			predelay,
+			rt60low,
+			rt60mid
+		)
+		)
+	}).add;
+
+	s.sync;
+
+	x = Synth(\testReverb, [\drylevel, 0.5, \predelay, 0, \lowfreq, 600, \midfreq, 6000, \rt60low, 1, \rt60mid, 1]);
+}
+)
+)
+
+// rt60 graves vs rt60 medios
+x.set(\rt60low, 5, \rt60mid, 1, \drylevel, 0.5, \predelay, 0);
+// rt60 graves vs rt60 medios edit Pablo
+x.set(\rt60low, 1, \rt60mid, 2, \drylevel, 1, \predelay, 0);
+// rt60 graves vs rt60 medios
+x.set(\rt60low, 5, \rt60mid, 1, \drylevel, 0.5, \predelay, 0);
+// rt60 medios vs rt60 graves
+x.set(\rt60low, 1, \rt60mid, 5, \drylevel, 0.5, \predelay, 0);
+// rt60 graves = medios, predelay 25 ms
+x.set(\rt60low, 10, \rt60mid, 10, \drylevel, 0.5, \predelay, 25);
+// Full rt60, wet, predelay
+x.set(\rt60low, 20, \rt60mid, 20, \drylevel, 1, \predelay, 250);
+// Crossover mínimos => más graves
+x.set(\lowfreq, 100, \midfreq, 1000);
+// Crossover máximos => más agudos
+x.set(\lowfreq, 1000, \midfreq, 10000);
+// Min rt60 graves, full wet
+x.set(\rt60low, 0.01 ,\rt60mid, 1, \drylevel, 0.25, \predelay, 250);
+
+x.free;
+
+/////////// Todos los parámetros modulados. El predelay está suavizado con un filtro de 1 polo para que se pueda modular sin más artefactos que el cambio de pitch.
+
+(
+y = { arg gate=1;
+
+	var sig, rev;
+
+	sig = ReFlute2.ar(
+		gate: gate,
+		freq: [36,39].midicps,
+		lpf: LFNoise1.kr(1).range(1000,3000),
+		soplo: 0.0015
+	);
+
+	rev = ZitaRev1ST.ar(
+		sig[0],
+		sig[1],
+		LFNoise1.kr(0.7).range(0,1.0),
+		LFNoise1.kr(0.25).range(100.0,1000),
+		LFNoise1.kr(0.15).range(1000.0,10000),
+		LFNoise1.kr(10).range(0.1,250),
+		LFNoise1.kr(0.5).range(2.0,20),
+		LFNoise1.kr(0.5).range(2.0,20),
+	);
+
+}.play;
+)
+
+y.set(\gate, 1);
+
+y.free;
+::
